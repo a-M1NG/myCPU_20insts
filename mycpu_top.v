@@ -103,8 +103,12 @@ module mycpu_top (
   wire [31:0] mem_result;
   wire [31:0] ms_final_result;
 
+  // 修改
+  wire        ds_valid;
+  wire        valid;
+  wire [31:0] final_result;
 
-  assign seq_pc = fs_pc + 3'h4;
+  assign seq_pc = pc + 3'h4;
   assign nextpc = br_taken ? br_target : seq_pc;
 
   always @(posedge clk) begin
@@ -243,7 +247,7 @@ module mycpu_top (
                    || inst_bl
                    || inst_b
                   ) && ds_valid;
-  assign br_target = (inst_beq || inst_bne || inst_bl || inst_b) ? (ds_pc + br_offs) :
+  assign br_target = (inst_beq || inst_bne || inst_bl || inst_b) ? (pc + br_offs) :
                                                    /*inst_jirl*/ (rj_value + jirl_offs);
 
   assign alu_src1 = src1_is_pc ? pc[31:0] : rj_value;
@@ -251,12 +255,12 @@ module mycpu_top (
 
   alu u_alu (
       .alu_op    (alu_op),
-      .alu_src1  (alu_src2),
+      .alu_src1  (alu_src1),   // 错误：alu_src1连接到了alu_src2
       .alu_src2  (alu_src2),
       .alu_result(alu_result)
   );
 
-  assign data_sram_en      = (rfrom_mem || mem_we) && valid;
+  assign data_sram_en      = (res_from_mem || mem_we) && valid;
   assign data_sram_we      = mem_we;
   assign data_sram_addr    = alu_result;
   assign data_sram_wdata   = rkd_value;
