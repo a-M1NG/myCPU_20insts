@@ -104,7 +104,8 @@ module mycpu_top (
   wire [31:0] ms_final_result;
 
   // 修改
-  wire        valid;
+  wire        valid; // 不知道干啥用的
+  assign valid = 1'b1;
   wire [31:0] final_result;
 
   assign seq_pc = pc + 3'h4;
@@ -219,7 +220,7 @@ module mycpu_top (
 
   assign res_from_mem = inst_ld_w;
   assign dst_is_r1 = inst_bl;
-  assign gr_we = ~inst_st_w & ~inst_beq & ~inst_bne & ~inst_b & ~inst_bl;
+  assign gr_we = ~inst_st_w & ~inst_beq & ~inst_bne & ~inst_b; // & ~inst_bl; // 错误：inst_bl应该写入寄存器
   assign mem_we = inst_st_w;
   assign dest = dst_is_r1 ? 5'd1 : rd;
 
@@ -259,7 +260,7 @@ module mycpu_top (
       .alu_result(alu_result)
   );
 
-  assign data_sram_en      = (res_from_mem || mem_we) && valid;
+  // assign data_sram_en      = (res_from_mem || mem_we) && valid;
   assign data_sram_we      = mem_we;
   assign data_sram_addr    = alu_result;
   assign data_sram_wdata   = rkd_value;
