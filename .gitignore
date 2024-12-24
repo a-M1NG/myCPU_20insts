@@ -1,4 +1,4 @@
-xsim.dir/work
+xsim.dir/
 xvlog.pb
 *.out
 *.vcd
