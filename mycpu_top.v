@@ -18,7 +18,8 @@ module mycpu_top (
     output wire [31:0] debug_wb_rf_wdata
 );
   reg reset;
-  always @(posedge clk) reset <= ~resetn;
+  always @(*)
+    reset <= ~resetn;  // 避免resetn信号的时序问题， 这里不改就会延后一个时钟周期
 
   wire [31:0] seq_pc;
   wire [31:0] nextpc;
@@ -104,7 +105,7 @@ module mycpu_top (
   wire [31:0] ms_final_result;
 
   // 修改
-  wire        valid; // 不知道干啥用的
+  wire        valid;  // 不知道干啥用的
   assign valid = 1'b1;
   wire [31:0] final_result;
 
@@ -196,9 +197,10 @@ module mycpu_top (
   assign need_si26 = inst_b | inst_bl;
   assign src2_is_4 = inst_jirl | inst_bl;
 
-  assign imm = src2_is_4 ? 32'h4                      :
-             need_si20 ? {i20[19:0], 12'b0}         :
-/*need_ui5 || need_si12*/{{20{i12[11]}}, i12[11:0]} ;
+  assign imm = src2_is_4 ? 32'h4           :
+             need_si20 ? {i20[19:0], 12'b0}:
+             need_ui5  ? rk[4:0]           :
+/*need_si12*/{{20{i12[11]}}, i12[11:0]} ; //needui5信号应该连接到rk[4:0]，而不是i12[11:0]
 
   assign br_offs = need_si26 ? {{4{i26[25]}}, i26[25:0], 2'b0} : {{14{i16[15]}}, i16[15:0], 2'b0};
 
@@ -274,7 +276,7 @@ module mycpu_top (
 
   // debug info generate
   assign debug_wb_pc       = pc;
-  assign debug_wb_rf_wen   = {4{rf_we}};
+  assign debug_wb_rf_we    = {4{rf_we}};  // 错误：应该是rf_we
   assign debug_wb_rf_wnum  = dest;
   assign debug_wb_rf_wdata = final_result;
 
