@@ -104,7 +104,6 @@ module mycpu_top (
   wire [31:0] ms_final_result;
 
   // 修改
-  wire        ds_valid;
   wire        valid;
   wire [31:0] final_result;
 
@@ -246,7 +245,7 @@ module mycpu_top (
                    || inst_jirl
                    || inst_bl
                    || inst_b
-                  ) && ds_valid;
+                  ) && valid;
   assign br_target = (inst_beq || inst_bne || inst_bl || inst_b) ? (pc + br_offs) :
                                                    /*inst_jirl*/ (rj_value + jirl_offs);
 
