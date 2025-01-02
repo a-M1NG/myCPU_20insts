@@ -18,8 +18,16 @@ module mycpu_top (
     output wire [31:0] debug_wb_rf_wdata
 );
   reg reset;
-  always @(*)
-    reset <= ~resetn;  // 避免resetn信号的时序问题， 这里不改就会延后一个时钟周期
+  always @(posedge clk) reset <= ~resetn;
+
+  reg valid;
+  always @(posedge clk) begin
+    if (reset) begin
+      valid <= 1'b0;
+    end else begin
+      valid <= 1'b1;
+    end
+  end
 
   wire [31:0] seq_pc;
   wire [31:0] nextpc;
@@ -103,17 +111,12 @@ module mycpu_top (
 
   wire [31:0] mem_result;
 
-  // 修改
-  wire        valid;
-  assign valid = 1'b1;
-  wire [31:0] final_result;
-
   assign seq_pc = pc + 3'h4;
   assign nextpc = br_taken ? br_target : seq_pc;
 
   always @(posedge clk) begin
     if (reset) begin
-      pc <= 32'h1c000000;
+      pc <= 32'h1bfffffc;  //trick: to make nextpc be 0x1c000000 during reset 
     end else begin
       pc <= nextpc;
     end
@@ -196,10 +199,9 @@ module mycpu_top (
   assign need_si26 = inst_b | inst_bl;
   assign src2_is_4 = inst_jirl | inst_bl;
 
-  assign imm = src2_is_4 ? 32'h4           :
-             need_si20 ? {i20[19:0], 12'b0}:
-             need_ui5  ? rk[4:0]           :
-/*need_si12*/{{20{i12[11]}}, i12[11:0]} ; //needui5信号应该连接到rk[4:0]，而不是i12[11:0]
+  assign imm = src2_is_4 ? 32'h4                      :
+             need_si20 ? {i20[19:0], 12'b0}         :
+/*need_ui5 || need_si12*/{{20{i12[11]}}, i12[11:0]} ;
 
   assign br_offs = need_si26 ? {{4{i26[25]}}, i26[25:0], 2'b0} : {{14{i16[15]}}, i16[15:0], 2'b0};
 
@@ -221,7 +223,7 @@ module mycpu_top (
 
   assign res_from_mem = inst_ld_w;
   assign dst_is_r1 = inst_bl;
-  assign gr_we = ~inst_st_w & ~inst_beq & ~inst_bne & ~inst_b; // & ~inst_bl; // 错误：inst_bl应该写入寄存器
+  assign gr_we = ~inst_st_w & ~inst_beq & ~inst_bne & ~inst_b & ~inst_bl;
   assign mem_we = inst_st_w;
   assign dest = dst_is_r1 ? 5'd1 : rd;
 
@@ -242,7 +244,12 @@ module mycpu_top (
   assign rkd_value = rf_rdata2;
 
   assign rj_eq_rd = (rj_value == rkd_value);
-  assign br_taken = inst_beq && rj_eq_rd || inst_bne && !rj_eq_rd || inst_jirl || inst_bl || inst_b;
+  assign br_taken = (   inst_beq  &&  rj_eq_rd
+                   || inst_bne  && !rj_eq_rd
+                   || inst_jirl
+                   || inst_bl
+                   || inst_b
+                  ) && valid;
   assign br_target = (inst_beq || inst_bne || inst_bl || inst_b) ? (pc + br_offs) :
                                                    /*inst_jirl*/ (rj_value + jirl_offs);
 
@@ -251,25 +258,25 @@ module mycpu_top (
 
   alu u_alu (
       .alu_op    (alu_op),
-      .alu_src1  (alu_src1),   // 错误：alu_src1连接到了alu_src2
+      .alu_src1  (alu_src2),
       .alu_src2  (alu_src2),
       .alu_result(alu_result)
   );
 
-  assign data_sram_we      = mem_we;
+  assign data_sram_we      = mem_we && valid;
   assign data_sram_addr    = alu_result;
   assign data_sram_wdata   = rkd_value;
 
   assign mem_result        = data_sram_rdata;
   assign final_result      = res_from_mem ? mem_result : alu_result;
 
-  assign rf_we             = gr_we;
+  assign rf_we             = gr_we && valid;
   assign rf_waddr          = dest;
   assign rf_wdata          = final_result;
 
   // debug info generate
   assign debug_wb_pc       = pc;
-  assign debug_wb_rf_we    = {4{rf_we}};  // 错误：应该是rf_we
+  assign debug_wb_rf_wen   = {4{rf_we}};
   assign debug_wb_rf_wnum  = dest;
   assign debug_wb_rf_wdata = final_result;
 
